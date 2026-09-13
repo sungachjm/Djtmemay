@@ -20,7 +20,7 @@ if (fs.existsSync("./prefix.json")) {
   client.prefix = data.prefix || "!";
 }
 
-require("./commands/prefix.js")(client);
+// Đã xóa dòng gọi file prefix.js bị thiếu ở đây
 require("./commands/role.js")(client);
 require("./commands/purge.js")(client);
 require("./commands/AFK.js")(client);
