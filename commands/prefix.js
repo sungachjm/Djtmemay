@@ -1,4 +1,4 @@
-require Loader
+import
 'use strict';
 
 const Command = Loader.require('./core/structures/Command');
