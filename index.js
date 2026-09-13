@@ -1,7 +1,13 @@
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 require('./keep_alive.js');
+
+// Khởi tạo biến Loader toàn cục để tránh lỗi "Loader is not defined" ở các tệp lệnh
+global.Loader = {
+  require: (relPath) => require(path.join(__dirname, relPath))
+};
 
 const client = new Client({
   intents: [
@@ -20,22 +26,27 @@ if (fs.existsSync("./prefix.json")) {
   client.prefix = data.prefix || "!";
 }
 
-// Đã xóa dòng gọi file prefix.js bị thiếu ở đây
-require("./commands/role.js")(client);
-require("./commands/purge.js")(client);
-require("./commands/AFK.js")(client);
-require("./commands/avatar.js")(client);
-require("./commands/ping.js")(client);
-require("./commands/kick.js")(client);
-require("./commands/ban.js")(client);
-require("./commands/unban.js")(client);
-require("./commands/mute.js")(client);
-require("./commands/unmute.js")(client);
-require("./commands/automod.js")(client);
-require("./commands/ccspam.js")(client);
-require("./commands/ccimage.js")(client);
+// Tự động quét và nạp toàn bộ các lệnh trong thư mục commands
+const commandsPath = path.join(__dirname, 'commands');
+if (fs.existsSync(commandsPath)) {
+  const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-client.once(Events.ClientReady, () => {});
+  for (const file of commandFiles) {
+    try {
+      const commandModule = require(path.join(commandsPath, file));
+      if (typeof commandModule === 'function') {
+        commandModule(client);
+      }
+      console.log(`[LOADED] Command: ${file}`);
+    } catch (err) {
+      console.error(`[ERROR] Không thể nạp file ${file}:`, err.message);
+    }
+  }
+}
+
+client.once(Events.ClientReady, () => {
+  console.log(`Bot đã online thành công với tên: ${client.user.tag}`);
+});
 
 client.login(process.env.TOKEN_BOT);
 
