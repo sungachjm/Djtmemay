@@ -4,7 +4,7 @@ const path = require('path');
 require('dotenv').config();
 require('./keep_alive.js');
 
-// Khởi tạo Loader toàn cục
+// Khai báo Loader toàn cục để các file trong commands không bị lỗi ReferenceError
 global.Loader = {
   require: (relPath) => require(path.join(__dirname, relPath))
 };
@@ -19,12 +19,10 @@ const client = new Client({
 });
 
 client.commands = new Map();
-client.prefix = "!";
-
-// Quét thư mục commands và tạo danh sách Slash Commands
-const commandsPath = path.join(__dirname, 'commands');
 const slashCommandsData = [];
 
+// Quét sạch toàn bộ các tệp .js nằm trong thư mục commands
+const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
   const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
@@ -32,40 +30,38 @@ if (fs.existsSync(commandsPath)) {
     try {
       const commandName = file.replace('.js', '').toLowerCase();
       const commandModule = require(path.join(commandsPath, file));
-      
+
       client.commands.set(commandName, commandModule);
 
-      // Đăng ký lệnh dạng Slash Command /
+      // Tạo cấu trúc Slash Command cho từng file lệnh trong thư mục
       const slashCmd = new SlashCommandBuilder()
         .setName(commandName)
-        .setDescription(`Thực thi lệnh ${commandName}`);
+        .setDescription(`Lệnh ${commandName}`);
 
       slashCommandsData.push(slashCmd.toJSON());
-      console.log(`[LOADED] Command: ${file}`);
     } catch (err) {
-      console.error(`[SKIP] File ${file}:`, err.message);
+      // Bỏ qua các file bị lỗi cấu trúc riêng để không làm ngắt quá trình nạp
     }
   }
 }
 
-// Đăng ký danh sách lệnh lên Discord API khi Bot sẵn sàng
 client.once(Events.ClientReady, async () => {
   console.log(`Bot đã online: ${client.user.tag}`);
 
+  // Đăng ký toàn bộ danh sách lệnh lên hệ thống Discord
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN_BOT);
   try {
-    console.log('Đang đồng bộ danh sách lệnh Slash (/) với Discord...');
+    console.log(`Đang đồng bộ ${slashCommandsData.length} lệnh lên Discord...`);
     await rest.put(
       Routes.applicationCommands(client.user.id),
       { body: slashCommandsData }
     );
-    console.log('Cập nhật lệnh Slash (/) thành công!');
+    console.log('Đã nạp thành công toàn bộ danh sách lệnh!');
   } catch (error) {
-    console.error('Lỗi khi đăng ký lệnh Slash:', error);
+    console.error('Lỗi khi nạp danh sách lệnh:', error);
   }
 });
 
-// Xử lý sự kiện khi người dùng gõ lệnh Slash (/)
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -76,7 +72,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === 'ping') {
       return await interaction.reply(`Ping: ${client.ws.ping}ms`);
     }
-    await interaction.reply({ content: `Đã nhận lệnh /${interaction.commandName}`, ephemeral: true });
+    await interaction.reply({ content: `Thực thi lệnh /${interaction.commandName}`, ephemeral: true });
   } catch (error) {
     console.error(error);
   }
