@@ -1,4 +1,4 @@
-const Loader = require('../core/structures/Loader');
+const { Command } = require('discord.js'); // Hoặc đổi sang cấu trúc chuẩn của discord.js
 'use strict';
 
 const Command = Loader.require('./core/structures/Command');
