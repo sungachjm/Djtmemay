@@ -1,3 +1,4 @@
+const Loader = require('../core/structures/Loader');
 'use strict';
 
 const Command = Loader.require('./core/structures/Command');
