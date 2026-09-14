@@ -9,7 +9,6 @@ const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
 
-// Web keep-alive nếu file tồn tại
 const keepAlive = path.join(__dirname, "keep_alive.js");
 if (fs.existsSync(keepAlive)) {
   try {
@@ -20,18 +19,10 @@ if (fs.existsSync(keepAlive)) {
   }
 }
 
-// =========================
-// CHECK ENV
-// =========================
-
 if (!process.env.TOKEN_BOT) {
   console.error("[ERROR] Không tìm thấy TOKEN_BOT.");
   process.exit(1);
 }
-
-// =========================
-// CLIENT
-// =========================
 
 const client = new Client({
   intents: [
@@ -42,191 +33,116 @@ const client = new Client({
   ]
 });
 
-// =========================
-// COMMAND SYSTEM
-// =========================
-
 client.commands = new Collection();
 client.prefix = "!";
 
-const commandsPath = path.join(__dirname, "commands");
-
-if (!fs.existsSync(commandsPath)) {
-  console.error("[ERROR] Không tìm thấy thư mục commands!");
-  process.exit(1);
+if (fs.existsSync("./prefix.json")) {
+  const data = JSON.parse(fs.readFileSync("./prefix.json", "utf8"));
+  client.prefix = data.prefix || "!";
 }
 
-const commandFiles = fs
-  .readdirSync(commandsPath)
-  .filter(file => file.endsWith(".js"));
+const commandModules = [
+  "./commands/prefix.js",
+  "./commands/role.js",
+  "./commands/purge.js",
+  "./commands/AFK.js",
+  "./commands/avatar.js",
+  "./commands/ping.js",
+  "./commands/kick.js",
+  "./commands/ban.js",
+  "./commands/unban.js",
+  "./commands/mute.js",
+  "./commands/unmute.js",
+  "./commands/automod.js",
+  "./commands/ccspam.js",
+  "./commands/ccimage.js",
+  "./commands/addmod.js",
+  "./commands/addrank.js",
+  "./commands/addrole.js",
+  "./commands/announce.js",
+  "./commands/autopurge.js",
+  "./commands/blacklist.js",
+  "./commands/botlist.js",
+  "./commands/clean.js",
+  "./commands/clearWarnings.js",
+  "./commands/deafen.js",
+  "./commands/delmod.js",
+  "./commands/delrank.js",
+  "./commands/delrole.js",
+  "./commands/diagnose.js",
+  "./commands/discrim.js",
+  "./commands/flipcoin.js",
+  "./commands/google.js",
+  "./commands/ignoreChannel.js",
+  "./commands/ignoreUser.js",
+  "./commands/ignored.js",
+  "./commands/info.js",
+  "./commands/inviteInfo.js",
+  "./commands/listmods.js",
+  "./commands/membercount.js",
+  "./commands/members.js",
+  "./commands/mentionable.js",
+  "./commands/modlogs.js",
+  "./commands/modules.js",
+  "./commands/nick.js",
+  "./commands/play.js",
+  "./commands/queue.js",
+  "./commands/randomcolor.js",
+  "./commands/rank.js",
+  "./commands/reason.js",
+  "./commands/remindme.js",
+  "./commands/rolecolor.js",
+  "./commands/roleinfo.js",
+  "./commands/rolename.js",
+  "./commands/rolepersist.js",
+  "./commands/roles.js",
+  "./commands/roll.js",
+  "./commands/rps.js",
+  "./commands/serverinfo.js",
+  "./commands/serverinvite.js",
+  "./commands/setnick.js",
+  "./commands/skip.js",
+  "./commands/softban.js",
+  "./commands/stats.js",
+  "./commands/stop.js",
+  "./commands/tag.js",
+  "./commands/tags.js",
+  "./commands/togglecommand.js",
+  "./commands/togglemodule.js",
+  "./commands/undeafen.js",
+  "./commands/uptime.js",
+  "./commands/volume.js",
+  "./commands/warn.js",
+  "./commands/warnings.js",
+  "./commands/whitelist.js",
+  "./commands/whois.js",
+  "./commands/youtube.js"
 
-console.log(`[SYSTEM] Tìm thấy ${commandFiles.length} file command.`);
+];
 
-for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
+for (const mod of commandModules) {
+  const filePath = path.join(__dirname, mod);
+  if (!fs.existsSync(filePath)) continue;
 
   try {
     const command = require(filePath);
-
-    /*
-     * Hỗ trợ nhiều kiểu export:
-     *
-     * module.exports = {...}
-     * module.exports = (client) => {...}
-     */
-
     if (typeof command === "function") {
-      // Một số command cũ tự đăng ký event
-      try {
-        command(client);
-        console.log(`[LOAD] ${file}`);
-      } catch (err) {
-        console.error(`[COMMAND ERROR] ${file}`);
-        console.error(err);
-      }
-
-      continue;
+      command(client);
+      console.log(`[LOAD] ${mod}`);
     }
-
-    if (command && typeof command === "object") {
-      const commandName =
-        command.name ||
-        command.data?.name ||
-        file.replace(".js", "").toLowerCase();
-
-      client.commands.set(commandName.toLowerCase(), command);
-
-      console.log(`[LOAD] ${file} -> ${commandName}`);
-      continue;
-    }
-
-    console.warn(`[SKIP] ${file} không phải command hợp lệ.`);
-
   } catch (err) {
-    console.error(`[LOAD ERROR] ${file}`);
+    console.error(`[LOAD ERROR] ${mod}`);
     console.error(err);
   }
 }
 
-// =========================
-// PREFIX COMMAND
-// =========================
-
-client.on(Events.MessageCreate, async message => {
-  try {
-    if (message.author.bot) return;
-
-    const prefix = client.prefix || "!";
-
-    if (!message.content.startsWith(prefix)) return;
-
-    const args = message.content
-      .slice(prefix.length)
-      .trim()
-      .split(/\s+/);
-
-    const commandName = args.shift()?.toLowerCase();
-
-    if (!commandName) return;
-
-    const command = client.commands.get(commandName);
-
-    if (!command) return;
-
-    // Hỗ trợ execute(message, args, client)
-    if (typeof command.execute === "function") {
-      await command.execute(message, args, client);
-      return;
-    }
-
-    // Hỗ trợ run(message, args, client)
-    if (typeof command.run === "function") {
-      await command.run(message, args, client);
-      return;
-    }
-
-  } catch (error) {
-    console.error("[MESSAGE COMMAND ERROR]", error);
-
-    try {
-      if (!message.replied) {
-        await message.reply("❌ Đã xảy ra lỗi khi thực hiện lệnh.");
-      }
-    } catch {}
-  }
-});
-
-// =========================
-// SLASH COMMAND
-// =========================
-
-client.on(Events.InteractionCreate, async interaction => {
-  try {
-    if (!interaction.isChatInputCommand()) return;
-
-    const command = client.commands.get(
-      interaction.commandName.toLowerCase()
-    );
-
-    if (!command) {
-      return interaction.reply({
-        content: "❌ Không tìm thấy lệnh này.",
-        ephemeral: true
-      });
-    }
-
-    if (typeof command.execute === "function") {
-      await command.execute(interaction, client);
-      return;
-    }
-
-    if (typeof command.run === "function") {
-      await command.run(interaction, client);
-      return;
-    }
-
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: "❌ Command chưa có hàm execute/run.",
-        ephemeral: true
-      });
-    }
-
-  } catch (error) {
-    console.error("[SLASH COMMAND ERROR]", error);
-
-    try {
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: "❌ Đã xảy ra lỗi khi thực hiện lệnh.",
-          ephemeral: true
-        });
-      } else {
-        await interaction.reply({
-          content: "❌ Đã xảy ra lỗi khi thực hiện lệnh.",
-          ephemeral: true
-        });
-      }
-    } catch {}
-  }
-});
-
-// =========================
-// READY
-// =========================
-
 client.once(Events.ClientReady, readyClient => {
   console.log("=================================");
   console.log(`✅ BOT ONLINE: ${readyClient.user.tag}`);
-  console.log(`📦 COMMANDS: ${client.commands.size}`);
   console.log(`🏠 SERVERS: ${readyClient.guilds.cache.size}`);
   console.log(`⚡ PING: ${readyClient.ws.ping}ms`);
   console.log("=================================");
 });
-
-// =========================
-// ERROR HANDLING
-// =========================
 
 client.on(Events.Error, error => {
   console.error("[DISCORD CLIENT ERROR]", error);
@@ -239,10 +155,6 @@ process.on("unhandledRejection", error => {
 process.on("uncaughtException", error => {
   console.error("[UNCAUGHT EXCEPTION]", error);
 });
-
-// =========================
-// LOGIN
-// =========================
 
 client.login(process.env.TOKEN_BOT)
   .then(() => {
